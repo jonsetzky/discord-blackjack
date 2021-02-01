@@ -6,22 +6,38 @@ reaction_yes = 9989
 import discord
 import asyncio
 
+from discord.activity import Game
+
+from blackjack import game
+
 def toList(l):
     newL = []
     for i in range(len(l)):
         newL.append(l.__getitem__(i))
     return newL
 
-import blackjack
-
 class MyClient(discord.Client):
     blackjackGames = dict()
 
+    isUpdatingGames = False
     async def update_blackjackgames(self):
         while True:
             for game in list(self.blackjackGames.values()):
-                await game.RunRound()
+                await game.Update()
             await asyncio.sleep(1)
+
+    async def end_blackjackgames(self):
+        for game in list(self.blackjackGames.values()):
+            await game.statusMessageObject.delete()
+
+    async def CreateBlackjackGame(self, channel, host):
+        bjg = game.Blackjack(channel, host, self.loop)
+        self.blackjackGames[channel.id] = bjg
+        bjg.AddPlayer(host)
+        #bjg = blackjack.MultiplayerBlackjack(channel, host)
+        if not self.isUpdatingGames:
+            self.loop.create_task(self.update_blackjackgames())
+            self.isUpdatingGames = True
 
     async def createRole(self, guild):
         p = discord.Permissions()
@@ -67,37 +83,53 @@ class MyClient(discord.Client):
         elif ("help" in message.content.lower()):
             await channel.send(content="I'm autocorrect")
         elif ("!blackjack" in message.content.lower()):
-            bjg = blackjack.MultiplayerBlackjack(channel, author)
-            self.loop.create_task(self.update_blackjackgames())
-            bjg.channel = channel
-            self.blackjackGames[channel.id] = bjg
-            bjg.AddPlayer(author)
+            await self.CreateBlackjackGame(channel, author)
+            
             await message.delete()
+        elif "shutdown" in message.content.lower():
+            await self.end_blackjackgames()
+            exit()
         
         if (channel.id in list(self.blackjackGames.keys())):
             bjg = self.blackjackGames[channel.id]
-            if ("start" == message.content.lower()[:5]):
-                startGameMessage = bjg.StartGame()
+            #if ("start" == message.content.lower()[:5]):
+            #    bjg.gameState += 1
+            if ("join" == message.content.lower()[:4]):
+                bjg.AddPlayer(author)
+                await channel.send(content=f"Welcome to the game {author.name}!", delete_after=3)
                 await message.delete()
-            elif ("join" == message.content.lower()[:4]):
-                addPlayerMsg = bjg.AddPlayer(author)
-                await message.delete()
-            elif ("continue" == message.content.lower()[:8]):
-                continueGameMsg = bjg.ContinueRound()
-                await message.delete()
+            #elif ("continue" == message.content.lower()[:8]):
+            #    self.blackjackGames[channel.id].RunRound()
             elif ("bet" == message.content.lower()[:3]):
-                bjg.AddUserBet(author, message.content.lower().split(' ')[1])
+                await bjg.OnBet(author, message.content.lower().split(' ')[1])
                 await message.delete()
+            elif "ready" in message.content.lower():
+                await game.Blackjack.SetPlayerReady(bjg, author)
+                await message.delete()
+            
 
 
 
     async def on_reaction_add(self, reaction, user):
         message = reaction.message
         channel = message.channel
-        author = message.author
+        if user.id == message.guild.me.id:
+            return
         if (channel.id in list(self.blackjackGames.keys())):
-            if (message == self.blackjackGames[channel.id].statusMessageObject):
-                self.blackjackGames[channel.id].AddUserReaction(user, ord(reaction.emoji))
+            game = self.blackjackGames[channel.id]
+            
+            if (message == game.mainEmbedObject):
+                game.OnReaction(user, ord(reaction.emoji))
+                await game.Update()
+                
+                # clear reactions
+                await message.clear_reaction(reaction)
+                await message.add_reaction(reaction)
 
 client = MyClient()
-client.run('Njc2NDIyOTM1OTMzODc4Mjgy.XkFd8w.9XgbGBDGViP-3YmPwZRQQlGaYKI')
+token = str()
+with open('token.tkn', 'r') as f:
+    token = f.read()
+    f.close()
+
+client.run(token)
