@@ -83,4 +83,4 @@ class Hand():
         return self.cardsSum() > 21
 
     def hasBlackjack(self):
-        return self.cardsSum == 21 and len(self.cards) < 3
+        return self.cardsSum() == 21 and len(self.cards) < 3

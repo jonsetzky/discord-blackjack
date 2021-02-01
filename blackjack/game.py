@@ -8,6 +8,7 @@ reaction_split = 128993
 import time
 
 import discord
+import discordapi
 
 import asyncio
 
@@ -21,7 +22,7 @@ updateQueue = {
             'send_embed': [],
             'edit_embed': []
         }
-
+"""
 # a thread that updates discrod
 async def UpdateDiscordThread():
     global updateQueue
@@ -35,7 +36,7 @@ async def UpdateDiscordThread():
             if key == 'edit_embed' and len(value) > 0:
                 for edit in value:
                     await discord.Message.edit(edit[0], embed=edit[1])
-        await asyncio.sleep(1)
+        await asyncio.sleep(1)"""
 
 class Blackjack():
 
@@ -116,6 +117,10 @@ class Blackjack():
         self.state += 1
 
     async def CreateEmbeds(self):
+        #self.dealerEmbedObject = await discordapi.DiscordAPI.SendMessage(self.channel, embed=discord.Embed.from_dict({
+        #    'title': 'Dealer',
+        #    'color': 16711680
+        #})
         self.dealerEmbedObject = await self.channel.send(embed=discord.Embed.from_dict({
             'title': 'Dealer',
             'color': 16711680
@@ -124,7 +129,7 @@ class Blackjack():
         self.playerEmbeds = list()
         for player in list(self.players.values()):
             self.playerEmbedsObjects[player.author.id] = await self.channel.send(embed=discord.Embed.from_dict({
-                'title': f'{player.author.name}',
+                'title': f'{player.author.name} – ' + player.isReady * ':white_check_mark:' + (1 - (player.isReady)) * ':x:',
                 'color': 16711680
             }))
 
@@ -214,10 +219,12 @@ class Blackjack():
             if self.lastState != self.state:
                 self.mainEmbedShouldUpdate = True
                 self.mainEmbed['title'] = 'Use the reactions to do an action'
-                self.mainEmbed['description'] = '🟢 to HIT\n🔴 to STAND\n🟡 to SPLIT (Not implemented yet)\n🔵 to DOUBLE (Not implemented yet)'
+                self.mainEmbed['description'] = '🟢 to HIT\n🔴 to STAND\n🟡 to SPLIT\n🔵 to DOUBLE'
                 
                 await discord.Message.add_reaction(self.mainEmbedObject, chr(reaction_hit))
                 await discord.Message.add_reaction(self.mainEmbedObject, chr(reaction_stand))
+                await discord.Message.add_reaction(self.mainEmbedObject, chr(reaction_double))
+                await discord.Message.add_reaction(self.mainEmbedObject, chr(reaction_split))
             #updateQueue['add_reaction'].append((self.mainEmbedObject, chr(reaction_hit)))
             #updateQueue['add_reaction'].append((self.mainEmbedObject, chr(reaction_stand)))
             #updateQueue['add_reaction'].append((self.mainEmbedObject, chr(reaction_split)))
@@ -272,7 +279,6 @@ class Blackjack():
         for (author, bet) in list(self.addedBets.items()):
             betInt = int(bet)
             player = self.players[author.id]
-            print(player)
 
             del self.addedBets[author]
             if betInt > player.money:
@@ -296,31 +302,79 @@ class Blackjack():
             player.embedShouldUpdate = True
             player.hands[0].cards.append(self.dealer.DealCard())
             player.hands[0].cards.append(self.dealer.DealCard())
+            if player.hands[0].hasBlackjack():
+                player.hands[0].state = 0
             await self.UpdatePlayerEmbed(player)
 
     async def GetActions(self):
         for (author, reaction) in list(self.addedReactions.items()):
             r = reaction
-            print(author)
             player = self.players[author.id]
 
             del self.addedReactions[author]
+
+            handIndex = player.activeHandIndex
             if r == reaction_hit:
-                player.hands[0].cards.append(self.dealer.DealCard())
-                if player.hands[0].hasBust():
-                    player.isReady = True
+                player.hands[handIndex].cards.append(self.dealer.DealCard())
+                if player.hands[handIndex].hasBust():
+                    if player.numHands() > handIndex + 1:
+                        player.activeHandIndex += 1
+                        player.embedShouldUpdate = True
+                    else:
+                        player.isReady = True
                 player.embedShouldUpdate = True
                 await self.UpdatePlayerEmbed(player)
             elif r == reaction_stand:
-                player.isReady = True
+                    if player.numHands() > handIndex + 1:
+                        player.activeHandIndex += 1
+                        player.embedShouldUpdate = True
+                    else:
+                        player.isReady = True
+            elif r == reaction_double:
+                if len(player.hands[handIndex].cards) < 3:
+                    if player.money >= player.hands[handIndex].bet:
+                        player.money -= player.hands[handIndex].bet
+                        player.hands[handIndex].bet += player.hands[handIndex].bet
+                        player.hands[handIndex].cards.append(self.dealer.DealCard())
+                        player.embedShouldUpdate = True
+                        if player.numHands() > handIndex + 1:
+                            player.activeHandIndex += 1
+                            player.embedShouldUpdate = True
+                        else:
+                            player.isReady = True
+                        await self.UpdatePlayerEmbed(player)
+            elif r == reaction_split:
+                if len(player.hands[handIndex].cards) == 2:
+                    c1 = player.hands[handIndex].cards[0]
+                    c2 = player.hands[handIndex].cards[1]
+                    originalBet = player.hands[handIndex].bet
+                    if player.money < originalBet:
+                        continue
+                    if c1.blackjackValue() == c2.blackjackValue():
+                        player.money -= originalBet
 
+                        hand1 = Hand()
+                        hand1.cards = []
+                        hand1.bet = originalBet
+                        hand1.cards.append(c1)
+                        hand1.cards.append(self.dealer.DealCard())
+                        
+                        hand2 = Hand()
+                        hand2.cards = []
+                        hand2.bet = originalBet
+                        hand2.cards.append(c2)
+                        hand2.cards.append(self.dealer.DealCard())
+
+                        player.hands = [
+                            hand1, hand2
+                        ]
+                        player.embedShouldUpdate = True
+                        await self.UpdatePlayerEmbed(player)
         return
 
     async def DoDealerActions(self):
         dealerCardSum = self.dealer.hand.cardsSum()
-        print(dealerCardSum)
         while dealerCardSum < 17:
-            print(dealerCardSum)
             self.dealer.hand.cards.append(self.dealer.DealCard())
             dealerCardSum = self.dealer.hand.cardsSum()
         self.dealer.embedShouldUpdate = True
@@ -347,7 +401,6 @@ class Blackjack():
             for hand in player.hands:
                 hand.state = self.GetHandState(hand)
             player.embedShouldUpdate = True
-        print("game ended, now time for results which are not implemented")
         if not self.resultsShowTimeSet:
             self.resultsShowTime = time.time()
             self.resultsShowTimeSet = True
@@ -360,4 +413,5 @@ class Blackjack():
             for hand in player.hands:
                 player.money += hand.pay()
             player.ClearHands()
+            player.activeHandIndex = 0
         self.dealer.hand = Hand()

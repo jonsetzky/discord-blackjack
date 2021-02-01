@@ -19,6 +19,9 @@ def toList(l):
 class MyClient(discord.Client):
     blackjackGames = dict()
 
+    def is_me(self, m):
+        return m.author == self.user
+
     isUpdatingGames = False
     async def update_blackjackgames(self):
         while True:
@@ -54,10 +57,8 @@ class MyClient(discord.Client):
 
 
     async def on_ready(self):
-        print('Logged on as {0}!'.format(self.user))
-        print('Active servers: ' + str(self.guilds))
         g = self.guilds.__getitem__(0)
-        print(g.id)
+        print('RUNNING...')
 
     async def on_message(self, message):
         guild = message.guild
@@ -69,13 +70,12 @@ class MyClient(discord.Client):
         if message.author == guild.me:
             return
 
-        print(f'{attachments}')
         if ("ching" in message.content.lower() and "chong" in message.content.lower()):
             g = self.guilds.__getitem__(0)
-            print(await channel.send(content='Ебать'))
+            await channel.send(content='Ебать')
         if ("allukala" in message.content.lower()):
             g = self.guilds.__getitem__(0)
-            print(await channel.send(content='*allukalu'))
+            await channel.send(content='*allukalu')
             #await message.delete()
             #await channel.send(content=(textContent.lower().replace('allukala', 'allukalu')))
         elif ("invite" in message.content.lower()):
@@ -89,6 +89,13 @@ class MyClient(discord.Client):
         elif "shutdown" in message.content.lower():
             await self.end_blackjackgames()
             exit()
+        elif "purgekomrade" in message.content.lower():
+            await channel.purge(limit=500, check=self.is_me)
+        elif "purgewholechannelatonce123123" in message.content.lower():
+            await channel.purge(limit=500)
+        elif "purge" == message.content.lower()[:5]:
+            await channel.send(content="if you send message containing string \"purgewholechannelatonce123123\" will purge 500 last messages", delete_after=7)
+                    
         
         if (channel.id in list(self.blackjackGames.keys())):
             bjg = self.blackjackGames[channel.id]

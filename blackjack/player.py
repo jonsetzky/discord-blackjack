@@ -13,6 +13,8 @@ class Player():
 
     author = 0
     money = 0 
+
+    activeHandIndex = 0
     hands = list()
 
     def __init__(self):
@@ -20,14 +22,23 @@ class Player():
 
         self.embedShouldUpdate = True
 
+    def numHands(self):
+        return len(self.hands)
+
     def RenderHands(self):
         if len(self.hands) < 1:
             return False
         outs = ""
+        index = 0
         for hand in self.hands:
-            outs += f"$**{hand.bet}**"
+            if self.activeHandIndex == index:
+                outs += "**"
+            outs += f"${hand.bet}"
             if len(hand.cards) > 0:
                 outs += f" – {hand.asString()}.\n"
+            if self.activeHandIndex == index:
+                outs += "**"
+            index += 1
         return str(outs)
 
     # returns an array of informations strips of form
@@ -45,7 +56,7 @@ class Player():
     @staticmethod
     def PlayerEmbed(player):
         embedDict = {
-            'title': str(player.author.name),
+            'title': f'{player.author.name} – ' + (player.isReady) * ':white_check_mark:' + (not player.isReady) * ':x:',
             'color': 16711680,
             'fields': list()
         }

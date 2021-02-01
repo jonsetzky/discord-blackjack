@@ -13,6 +13,9 @@ class Card():
     def value(self):
         return (self.id % 13) + 1
 
+    def blackjackValue(self):
+        return min(self.value(), 10)
+
     def suit(self):
         return int(self.id / 13)
 
