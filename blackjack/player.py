@@ -22,6 +22,12 @@ class Player():
 
         self.embedShouldUpdate = True
 
+        self.hasInsurance = False
+        self.insurance = 0
+
+        self.hasAutoBet = False
+        self.autoBetAmount = 0
+
     def numHands(self):
         return len(self.hands)
 
@@ -32,7 +38,7 @@ class Player():
         index = 0
         for hand in self.hands:
             if self.activeHandIndex == index:
-                outs += "**"
+                outs += "-> **"
             outs += f"${hand.bet}"
             if len(hand.cards) > 0:
                 outs += f" – {hand.asString()}.\n"
@@ -56,7 +62,10 @@ class Player():
     @staticmethod
     def PlayerEmbed(player):
         embedDict = {
-            'title': f'{player.author.name} – ' + (player.isReady) * ':white_check_mark:' + (not player.isReady) * ':x:',
+            'title':    f'{player.author.name} – ' + 
+                        ((player.isReady) * ':white_check_mark:' + 
+                        (not player.isReady) * ':x:') + 
+                        (player.hasAutoBet) * ' :a:',
             'color': 16711680,
             'fields': list()
         }

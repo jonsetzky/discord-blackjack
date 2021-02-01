@@ -60,6 +60,9 @@ class MyClient(discord.Client):
         g = self.guilds.__getitem__(0)
         print('RUNNING...')
 
+        with open('blackjackhelp.txt', 'r') as f:
+            self.blackjackHelp = f.read()
+
     async def on_message(self, message):
         guild = message.guild
         channel = message.channel
@@ -80,8 +83,8 @@ class MyClient(discord.Client):
             #await channel.send(content=(textContent.lower().replace('allukala', 'allukalu')))
         elif ("invite" in message.content.lower()):
             g = self.guilds.__getitem__(0)
-        elif ("help" in message.content.lower()):
-            await channel.send(content="I'm autocorrect")
+        #elif ("help" in message.content.lower()):
+        #    await channel.send(content="I'm autocorrect")
         elif ("!blackjack" in message.content.lower()):
             await self.CreateBlackjackGame(channel, author)
             
@@ -113,11 +116,20 @@ class MyClient(discord.Client):
             elif "ready" in message.content.lower():
                 await game.Blackjack.SetPlayerReady(bjg, author)
                 await message.delete()
+            elif "autobet" == message.content.lower()[:7]:
+                if message.content.lower().split(' ')[1] == "off":
+                    await game.Blackjack.SetAutoBet(bjg, author, 0)
+                else:    
+                    await game.Blackjack.SetAutoBet(bjg, author, message.content.lower().split(' ')[1])
+            elif "help" in message.content.lower():
+                await channel.send(content=self.blackjackHelp)
+            await message.delete()
             
 
 
 
     async def on_reaction_add(self, reaction, user):
+        #print(ord(reaction.emoji))
         message = reaction.message
         channel = message.channel
         if user.id == message.guild.me.id:

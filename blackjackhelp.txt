@@ -1,0 +1,2 @@
+```autobet <amount>/off    - sets autobet on or off
+quit                    - leave from the game```

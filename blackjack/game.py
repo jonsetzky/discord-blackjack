@@ -4,6 +4,7 @@ reaction_hit = 128994
 reaction_stand = 128308
 reaction_double = 128309
 reaction_split = 128993
+reaction_insurance = 128280
 
 import time
 
@@ -109,6 +110,15 @@ class Blackjack():
         player.hands.append(h)
         player.money = player.money - int(bet)
 
+    async def SetAutoBet(self, author, amount):
+        if int(amount) == 0:
+            self.players[author.id].hasAutoBet = False
+        else:    
+            self.players[author.id].hasAutoBet = True
+        self.players[author.id].autoBetAmount = int(amount)
+
+    def canInsurance(self):
+        return self.dealer.hand.cards[0].value() == 1
 
     def NextState(self):
         self.lastState = self.state
@@ -219,12 +229,15 @@ class Blackjack():
             if self.lastState != self.state:
                 self.mainEmbedShouldUpdate = True
                 self.mainEmbed['title'] = 'Use the reactions to do an action'
-                self.mainEmbed['description'] = '🟢 to HIT\n🔴 to STAND\n🟡 to SPLIT\n🔵 to DOUBLE'
+                self.mainEmbed['description'] = f'🟢 to HIT\n🔴 to STAND\n🟡 to SPLIT\n🔵 to DOUBLE\n' + (self.canInsurance())*('🔘 to INSURANCE (not implemented)')
                 
                 await discord.Message.add_reaction(self.mainEmbedObject, chr(reaction_hit))
                 await discord.Message.add_reaction(self.mainEmbedObject, chr(reaction_stand))
                 await discord.Message.add_reaction(self.mainEmbedObject, chr(reaction_double))
                 await discord.Message.add_reaction(self.mainEmbedObject, chr(reaction_split))
+                if self.canInsurance():
+                    await discord.Message.add_reaction(self.mainEmbedObject, chr(reaction_insurance))
+
             #updateQueue['add_reaction'].append((self.mainEmbedObject, chr(reaction_hit)))
             #updateQueue['add_reaction'].append((self.mainEmbedObject, chr(reaction_stand)))
             #updateQueue['add_reaction'].append((self.mainEmbedObject, chr(reaction_split)))
@@ -276,6 +289,17 @@ class Blackjack():
         self.lastState = self.state
 
     async def GetBets(self):
+        for player in list(self.players.values()):
+            if player.hasAutoBet and not player.isReady:
+                if player.autoBetAmount > player.money:
+                    player.hasAutoBet = False
+                else:
+                    await self.SetBet(player, player.autoBetAmount)
+                    player.embedShouldUpdate = True
+                    await self.UpdatePlayerEmbed(player)
+                    player.isReady = True
+
+
         for (author, bet) in list(self.addedBets.items()):
             betInt = int(bet)
             player = self.players[author.id]
@@ -370,6 +394,13 @@ class Blackjack():
                         ]
                         player.embedShouldUpdate = True
                         await self.UpdatePlayerEmbed(player)
+            elif r == reaction_insurance:
+                insurancePrice = (player.hands[0].bet / 2)
+                if player.money >= insurancePrice:
+                    player.money -= insurancePrice
+                    player.hasInsurance = True
+                    player.insurance = player.hands[0].bet
+                print('insurance not implemented yet')
         return
 
     async def DoDealerActions(self):
@@ -398,6 +429,8 @@ class Blackjack():
 
     async def ShowResults(self):
         for player in list(self.players.values()):
+            if player.hasInsurance and self.dealer.hand.hasBlackjack():
+                player.money += player.insurance
             for hand in player.hands:
                 hand.state = self.GetHandState(hand)
             player.embedShouldUpdate = True
@@ -414,4 +447,6 @@ class Blackjack():
                 player.money += hand.pay()
             player.ClearHands()
             player.activeHandIndex = 0
+            player.hasInsurance = False
+            player.insurance = 0
         self.dealer.hand = Hand()
