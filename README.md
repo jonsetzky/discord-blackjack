@@ -1,5 +1,5 @@
 # discord-blackjack
- A rusty and unorganized discord bot that you can play blackjack with
+ A rusty and unorganized discord bot you can play blackjack with
  
 ## Usage
 #### To enable the bot on your server: 
