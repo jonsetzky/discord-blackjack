@@ -9,7 +9,6 @@ reaction_insurance = 128280
 import time
 
 import discord
-import discordapi
 
 import asyncio
 
